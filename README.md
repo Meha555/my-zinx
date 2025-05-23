@@ -1,5 +1,7 @@
 # MY-ZINX
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Meha555/my-zinx)
+
 TCP长连接框架，包含服务器部分和客户端部分。
 
 特点：
