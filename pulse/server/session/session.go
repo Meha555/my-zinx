@@ -8,8 +8,8 @@ import (
 	"pulse/server/common"
 	"pulse/server/job"
 
-	utils "pulse/utils"
 	"net"
+	utils "pulse/utils"
 	"sync/atomic"
 
 	"pulse/logging"
@@ -18,57 +18,6 @@ import (
 )
 
 var logger = logging.NewStdLogger(logging.LevelInfo, "session", "[%t] [%c %l] [%f:%C:%L:%g] %m", false)
-
-type zHooks struct {
-	OnOpen     SessionHook
-	OnClose    SessionHook
-	BeforeSend SessionHook
-	BeforeRecv SessionHook
-	AfterSend  SessionHook
-	AfterRecv  SessionHook
-}
-
-type SessionHook func(common.ISession)
-type zHookOpt func(c *Session)
-
-// 定义一个空函数
-var noOp SessionHook = func(common.ISession) {}
-
-func OnOpen(f SessionHook) zHookOpt {
-	return func(c *Session) {
-		c.hookStub.OnOpen = f
-	}
-}
-
-func OnClose(f SessionHook) zHookOpt {
-	return func(c *Session) {
-		c.hookStub.OnClose = f
-	}
-}
-
-func BeforeSend(f SessionHook) zHookOpt {
-	return func(c *Session) {
-		c.hookStub.BeforeSend = f
-	}
-}
-
-func BeforeRecv(f SessionHook) zHookOpt {
-	return func(c *Session) {
-		c.hookStub.BeforeRecv = f
-	}
-}
-
-func AfterSend(f SessionHook) zHookOpt {
-	return func(c *Session) {
-		c.hookStub.AfterSend = f
-	}
-}
-
-func AfterRecv(f SessionHook) zHookOpt {
-	return func(c *Session) {
-		c.hookStub.AfterRecv = f
-	}
-}
 
 // Session
 // 将裸的TCP socket包装，将具体的业务与连接绑定
@@ -90,10 +39,10 @@ type Session struct {
 	// 通知该连接已经停止
 	exitCh chan struct{}
 
-	hookStub zHooks
+	hookStub hooks
 }
 
-func NewSession(conn *net.TCPConn, workerPool *job.WorkerPool, opts ...zHookOpt) *Session {
+func NewSession(conn *net.TCPConn, workerPool *job.WorkerPool, hookOpts ...hookOpt) *Session {
 	c := &Session{
 		conn:       conn,
 		sessionID:  uuid.New(),
@@ -102,7 +51,7 @@ func NewSession(conn *net.TCPConn, workerPool *job.WorkerPool, opts ...zHookOpt)
 		workerPool: workerPool,
 		msgCh:      make(chan []byte, utils.Conf.Server.MaxMsgQueueSize), // 这里设置缓冲区大小为10，允许读写协程的处理速率有一定的差异
 		exitCh:     make(chan struct{}, 1),                               // 这里设置为 1，确保至少有一个缓冲区，防止写入时没人读导致阻塞，或者反之
-		hookStub: zHooks{
+		hookStub: hooks{
 			OnOpen:     noOp,
 			OnClose:    noOp,
 			BeforeSend: noOp,
@@ -112,7 +61,7 @@ func NewSession(conn *net.TCPConn, workerPool *job.WorkerPool, opts ...zHookOpt)
 		},
 	}
 
-	for _, opt := range opts {
+	for _, opt := range hookOpts {
 		opt(c)
 	}
 
